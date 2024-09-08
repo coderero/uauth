@@ -1,0 +1,9 @@
+certs/*
+!certs/.gitkeep
+
+bin/*
+!bin/.gitkeep
+.env
+
+.vscode/
+.DS_Store
