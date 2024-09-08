@@ -109,6 +109,7 @@ air
 │   └── .gitkeep
 └── tests
     └── .gitkeep
+```
 
 ## API Documentation
 The API documentation can be found [here](https://documenter.getpostman.com/view/11636691/TzJx8w7T)
