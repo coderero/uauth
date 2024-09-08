@@ -8,7 +8,7 @@ func (s *Server) RegisterRoutes() {
 	/* Configuration of the Middlewares */
 
 	// Global Middleware
-	// s.App.Use(s.csrfHandler.CsrfMiddleware)
+	s.App.Use(s.csrfHandler.CsrfMiddleware)
 	s.App.Use(recover.New())
 
 	/* Grouping Routes */
