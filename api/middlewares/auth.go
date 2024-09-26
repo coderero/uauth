@@ -137,9 +137,27 @@ func (a *authMiddleware) AuthMiddleware(c *fiber.Ctx) error {
 			c.Set("Authorization", "Bearer "+newAccessToken)
 		}
 
+		c.Locals("user", sub)
 		return c.Next()
 	}
 
+	claims, err := a.jwtService.GetClaims(tokenConfig.AccessToken)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
+			Status:  fiber.StatusUnauthorized,
+			Message: "unauthorized",
+		})
+	}
+
+	sub, ok := (*claims)["sub"].(string)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
+			Status:  fiber.StatusUnauthorized,
+			Message: "unauthorized",
+		})
+	}
+
+	c.Locals("user", sub)
 	return c.Next()
 }
 
