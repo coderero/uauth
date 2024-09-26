@@ -2,22 +2,24 @@ package models
 
 import (
 	"net"
+
+	"github.com/coderero/paas-project/internal/types"
 )
 
 // User represents a user in the system.
 type User struct {
-	ID           int    `json:"id"`
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
-	Username     string `json:"username"`
-	Email        string `json:"email"`
-	Password     string `json:"password"`
-	IsSuperadmin bool   `json:"is_superadmin"`
-	IsAdmin      bool   `json:"is_admin"`
-	IsActive     bool   `json:"is_active"`
-	CreatedAt    any    `json:"created_at"`
-	UpdatedAt    any    `json:"updated_at"`
-	DeletedAt    any    `json:"deleted_at"`
+	ID           int            `json:"id"`
+	FirstName    string         `json:"first_name"`
+	LastName     string         `json:"last_name"`
+	Username     string         `json:"username"`
+	Email        string         `json:"email"`
+	Password     string         `json:"password"`
+	IsSuperadmin bool           `json:"is_superadmin"`
+	IsAdmin      bool           `json:"is_admin"`
+	IsActive     bool           `json:"is_active"`
+	CreatedAt    types.NullTime `json:"created_at"`
+	UpdatedAt    types.NullTime `json:"updated_at"`
+	DeletedAt    types.NullTime `json:"deleted_at"`
 }
 
 func (u *User) GetRole() string {
