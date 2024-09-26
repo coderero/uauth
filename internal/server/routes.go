@@ -20,7 +20,8 @@ func (s *Server) RegisterRoutes() {
 
 	// Auth Group
 	auth := s.App.Group("/auth/v1")
-	// auth.Use(s.authMiddleWare.AuthRouteMiddleware)
+	auth.Use(s.authMiddleWare.AuthRouteMiddleware)
+
 	// Auth Routes
 	auth.Post("/register", s.authHandler.Register)
 	auth.Post("/login", s.authHandler.Login)
