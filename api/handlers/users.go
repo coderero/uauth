@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/coderero/paas-project/internal/services"
 	"github.com/coderero/paas-project/internal/types"
+	"github.com/coderero/paas-project/internal/utils"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 )
@@ -42,12 +43,18 @@ func NewUserHandler(v *validator.Validate, us services.UserService) *UserHandler
 func (u *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 	id, err := ctx.ParamsInt("id")
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid user ID")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "invalid user id",
+		})
 	}
 
 	user, err := u.userService.GetByID(id)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+			Status:  fiber.StatusNotFound,
+			Message: "user not found",
+		})
 	}
 
 	safeUser := safeUserResponse{
@@ -67,7 +74,10 @@ func (u *UserHandler) GetUserByUsername(ctx *fiber.Ctx) error {
 
 	user, err := u.userService.GetByUsername(username)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+			Status:  fiber.StatusNotFound,
+			Message: "user not found",
+		})
 	}
 
 	safeUser := safeUserResponse{
@@ -87,7 +97,10 @@ func (u *UserHandler) GetUserByEmail(ctx *fiber.Ctx) error {
 
 	user, err := u.userService.GetByEmail(email)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+			Status:  fiber.StatusNotFound,
+			Message: "user not found",
+		})
 	}
 
 	safeUser := safeUserResponse{
@@ -132,7 +145,10 @@ func (u *UserHandler) GetAllActive(ctx *fiber.Ctx) error {
 
 	users, err := u.userService.GetAllActive(role, page, limit)
 	if err != nil {
-		return fiber.NewError(fiber.StatusForbidden, "invalid permission")
+		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
+			Status:  fiber.StatusForbidden,
+			Message: "invalid permission",
+		})
 	}
 
 	var safeUsers []safeUserResponse
@@ -181,7 +197,10 @@ func (u *UserHandler) GetAllInactive(ctx *fiber.Ctx) error {
 
 	users, err := u.userService.GetAllInactive(role, page, limit)
 	if err != nil {
-		return fiber.NewError(fiber.StatusForbidden, "invalid permission")
+		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
+			Status:  fiber.StatusForbidden,
+			Message: "invalid permission",
+		})
 	}
 
 	var safeUsers []safeUserResponse
@@ -230,7 +249,10 @@ func (u *UserHandler) GetAll(ctx *fiber.Ctx) error {
 
 	users, err := u.userService.GetAll(role, page, limit)
 	if err != nil {
-		return fiber.NewError(fiber.StatusForbidden, "invalid permission")
+		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
+			Status:  fiber.StatusForbidden,
+			Message: "invalid permission",
+		})
 	}
 
 	var safeUsers []safeUserResponse
@@ -252,7 +274,10 @@ func (u *UserHandler) GetAll(ctx *fiber.Ctx) error {
 func (u *UserHandler) Update(ctx *fiber.Ctx) error {
 	id, err := ctx.ParamsInt("id")
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid user ID")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "invalid user id",
+		})
 	}
 
 	sub, ok := ctx.Locals("user").(string)
@@ -281,11 +306,19 @@ func (u *UserHandler) Update(ctx *fiber.Ctx) error {
 
 	var req userUpdateRequest
 	if err := ctx.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "validation error",
+			Details: utils.ProcessError(err),
+		})
 	}
 
 	if err := u.validator.Struct(req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "validation error",
+			Details: utils.ProcessValidationErrors(err),
+		})
 	}
 
 	user, err := u.userService.GetByID(id)
@@ -299,7 +332,10 @@ func (u *UserHandler) Update(ctx *fiber.Ctx) error {
 	user.Email = req.Email
 
 	if err := u.userService.Update(user); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "internal server error")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "something went wrong",
+		})
 	}
 
 	return ctx.JSON(types.APIResponse{
@@ -320,16 +356,27 @@ func (u *UserHandler) UpdateSelf(ctx *fiber.Ctx) error {
 
 	var req userUpdateRequest
 	if err := ctx.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "validation error",
+			Details: utils.ProcessError(err),
+		})
 	}
 
 	if err := u.validator.Struct(req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "validation error",
+			Details: utils.ProcessValidationErrors(err),
+		})
 	}
 
 	user, err := u.userService.GetByEmail(sub)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+			Status:  fiber.StatusNotFound,
+			Message: "user not found",
+		})
 	}
 
 	user.FirstName = req.FirstName
@@ -338,7 +385,10 @@ func (u *UserHandler) UpdateSelf(ctx *fiber.Ctx) error {
 	user.Email = req.Email
 
 	if err := u.userService.Update(user); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "internal server error")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "something went wrong",
+		})
 	}
 
 	return ctx.JSON(types.APIResponse{
@@ -351,7 +401,10 @@ func (u *UserHandler) UpdateSelf(ctx *fiber.Ctx) error {
 func (u *UserHandler) SoftDelete(ctx *fiber.Ctx) error {
 	id, err := ctx.ParamsInt("id")
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid user ID")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "invalid user id",
+		})
 	}
 
 	sub, ok := ctx.Locals("user").(string)
@@ -379,7 +432,10 @@ func (u *UserHandler) SoftDelete(ctx *fiber.Ctx) error {
 	}
 
 	if err := u.userService.SoftDelete(id); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "internal server error")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "something went wrong",
+		})
 	}
 
 	return ctx.JSON(types.APIResponse{
@@ -400,11 +456,19 @@ func (u *UserHandler) SoftDeleteSelf(ctx *fiber.Ctx) error {
 
 	var req deleteSelfRequest
 	if err := ctx.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "validation error",
+			Details: utils.ProcessError(err),
+		})
 	}
 
 	if err := u.validator.Struct(req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "validation error",
+			Details: utils.ProcessValidationErrors(err),
+		})
 	}
 
 	if !req.Confirm {
@@ -416,12 +480,21 @@ func (u *UserHandler) SoftDeleteSelf(ctx *fiber.Ctx) error {
 
 	user, err := u.userService.GetByEmail(sub)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+			Status:  fiber.StatusNotFound,
+			Message: "user not found",
+		})
 	}
 
 	if err := u.userService.SoftDelete(user.ID); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "internal server error")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "something went wrong",
+		})
 	}
+
+	ctx.ClearCookie("__Secure_a_token")
+	ctx.ClearCookie("__Secure_r_token")
 
 	return ctx.JSON(types.APIResponse{
 		Status:  fiber.StatusOK,
@@ -433,7 +506,10 @@ func (u *UserHandler) SoftDeleteSelf(ctx *fiber.Ctx) error {
 func (u *UserHandler) HardDelete(ctx *fiber.Ctx) error {
 	id, err := ctx.ParamsInt("id")
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid user ID")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "invalid user id",
+		})
 	}
 
 	sub, ok := ctx.Locals("user").(string)
@@ -461,7 +537,10 @@ func (u *UserHandler) HardDelete(ctx *fiber.Ctx) error {
 	}
 
 	if err := u.userService.HardDelete(id); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "internal server error")
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "something went wrong",
+		})
 	}
 
 	return ctx.JSON(types.APIResponse{
