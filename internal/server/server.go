@@ -36,6 +36,7 @@ type Server struct {
 	// handlers
 	authHandler *handlers.AuthHandler
 	csrfHandler *handlers.CsrfHandler
+	userHandler *handlers.UserHandler
 }
 
 func New() *Server {
@@ -46,14 +47,14 @@ func New() *Server {
 	}
 
 	// Initialize the cache
-	c := cache.New()
+	redisCache := cache.New()
 
 	// Initialize the validator
-	v := validator.New()
-	v.RegisterTagNameFunc(utils.ValidatorTagFunc)
+	validatorInstance := validator.New()
+	validatorInstance.RegisterTagNameFunc(utils.ValidatorTagFunc)
 
 	// Initialize the jwt cache
-	jwtCache := cache.NewJwtCache(c.Cache())
+	jwtCache := cache.NewJwtCache(redisCache.Cache())
 
 	// Initialize the user repository
 	userRepo := database.NewUserRepository(db)
@@ -64,11 +65,17 @@ func New() *Server {
 	// Initialize the jwt service
 	jwtService := services.NewJwtService(jwtCache)
 
+	// Intialize the user service
+	userService := services.NewUserService(userRepo, cryptoService)
+
 	// Initialize the middleware service
 	authMiddleWare := middlewares.NewAuthMiddleware(jwtService)
 
 	// Initialize the auth service
 	authService := services.NewAuthService(cryptoService, userRepo, jwtService)
+
+	// Initialize the user handler
+	userHandler := handlers.NewUserHandler(validatorInstance, userService)
 
 	return &Server{
 		App: fiber.New(
@@ -77,15 +84,16 @@ func New() *Server {
 			},
 		),
 		db:             db,
-		cache:          c,
-		validator:      v,
+		cache:          redisCache,
+		validator:      validatorInstance,
 		jwtCache:       jwtCache,
 		userRepo:       userRepo,
 		cryptoService:  cryptoService,
 		jwtService:     jwtService,
 		authService:    authService,
 		authMiddleWare: authMiddleWare,
-		authHandler:    handlers.NewAuthHandler(authService, v),
-		csrfHandler:    handlers.NewCsrfHandler(c),
+		csrfHandler:    handlers.NewCsrfHandler(redisCache),
+		authHandler:    handlers.NewAuthHandler(authService, validatorInstance),
+		userHandler:    userHandler,
 	}
 }

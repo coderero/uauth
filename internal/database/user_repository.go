@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"errors"
+	"log"
 	"net"
 
 	"github.com/coderero/paas-project/api/models"
@@ -50,6 +51,9 @@ type UserRepository interface {
 }
 
 type OptionalArgs struct {
+	// Get all users, including deleted ones but remeber that the admin and superadmin
+	// flags need to be set to true to be able to get all users including the admin and superadmin users
+	All        bool
 	Admin      bool
 	Superadmin bool
 	Active     bool
@@ -111,7 +115,15 @@ func (s *userRepository) GetUser(id int, optional ...OptionalArgs) (*models.User
 }
 
 func (s *userRepository) GetUsers(page, limit int, optional ...OptionalArgs) ([]*models.User, error) {
-	query := `SELECT * FROM auth_users WHERE ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	// Ensure page and limit are valid
+	if page < 1 {
+		return nil, errors.New("page must be greater than 0")
+	}
+	if limit < 1 {
+		return nil, errors.New("limit must be greater than 0")
+	}
+
+	query := `SELECT * FROM auth_users WHERE id > 0`
 	if len(optional) > 0 {
 		s.processOptionalArgs(&query, optional[0])
 	} else if len(optional) > 1 {
@@ -119,13 +131,20 @@ func (s *userRepository) GetUsers(page, limit int, optional ...OptionalArgs) ([]
 	} else {
 		query += " AND deleted_at IS NULL"
 	}
+	query += " ORDER BY created_at DESC LIMIT $1 OFFSET $2"
 
-	rows, err := s.db.Query(query, limit, (page-1)*limit)
+	log.Printf("Query: %s", query)
+
+	// Calculate offset
+	offset := (page - 1) * limit
+
+	rows, err := s.db.Query(query, limit, offset)
 	if err != nil {
 		return nil, err
 	}
-	var users []*models.User
+	defer rows.Close()
 
+	var users []*models.User
 	for rows.Next() {
 		var user models.User
 		err = rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Username, &user.Email, &user.Password, &user.IsSuperadmin, &user.IsAdmin, &user.IsActive, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
@@ -133,6 +152,10 @@ func (s *userRepository) GetUsers(page, limit int, optional ...OptionalArgs) ([]
 			return nil, err
 		}
 		users = append(users, &user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return users, nil

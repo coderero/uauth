@@ -130,9 +130,31 @@ func (s *authService) Login(ctx context.Context, email, password string) (*types
 }
 
 func (s *authService) Register(ctx context.Context, user *models.User) (*types.Tokens, int, error) {
-	// Get the user by email
-	_, err := s.userRepository.GetUserByEmail(user.Email)
-	if !errors.Is(err, sql.ErrNoRows) {
+	// Get the user by email and username
+	g, _ := errgroup.WithContext(ctx)
+	var emailExists, usernameExists bool
+	g.Go(func() error {
+		var err error
+		_, err = s.userRepository.GetUserByEmail(user.Email)
+		if !errors.Is(err, sql.ErrNoRows) {
+			emailExists = true
+		}
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		_, err = s.userRepository.GetUserByUsername(user.Username)
+		if !errors.Is(err, sql.ErrNoRows) {
+			usernameExists = true
+		}
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, 0, err
+	}
+
+	if emailExists || usernameExists {
 		return nil, 0, ErrUserAlreadyExists
 	}
 

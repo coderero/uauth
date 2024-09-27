@@ -5,8 +5,6 @@ import (
 )
 
 func (s *Server) RegisterRoutes() {
-	/* Configuration of the Middlewares */
-
 	// Global Middleware
 	s.App.Use(s.csrfHandler.CsrfMiddleware)
 	s.App.Use(recover.New())
@@ -15,8 +13,6 @@ func (s *Server) RegisterRoutes() {
 	apiV1 := s.App.Group("/api/v1")
 	// CSRF Routes
 	apiV1.Get("/csrf", s.csrfHandler.CsrfMiddleware, s.csrfHandler.CSRF)
-	// Auth Middleware
-	apiV1.Use(s.authMiddleWare.AuthMiddleware)
 
 	// Auth Group
 	auth := s.App.Group("/auth/v1")
@@ -29,4 +25,23 @@ func (s *Server) RegisterRoutes() {
 	auth.Post("/reset-password", s.authHandler.ResetPassword)
 	auth.Post("/reset-password/verify/:token", s.authHandler.ResetPasswordConfirm)
 	auth.Post("/logout", s.authHandler.Logout)
+
+	// Auth Middleware
+	apiV1.Use(s.authMiddleWare.AuthMiddleware)
+
+	// User Routes
+	apiV1.Post("/users", s.userHandler.CreateUser)
+	apiV1.Get("/users", s.userHandler.GetAll)
+	apiV1.Get("/users/inactive", s.userHandler.GetAllInactive)
+	apiV1.Get("/users/active", s.userHandler.GetAllActive)
+	apiV1.Get("/users/deleted", s.userHandler.GetAllDeleted)
+	apiV1.Get("/users/:id", s.userHandler.GetUserByID)
+	apiV1.Get("/users/:username", s.userHandler.GetUserByUsername)
+	apiV1.Post("/users/:email", s.userHandler.GetUserByEmail)
+	apiV1.Put("/users/:id", s.userHandler.UpdateUser)
+	apiV1.Delete("/users/:id/soft", s.userHandler.SoftDeleteUser)
+	apiV1.Delete("/users/:id/hard", s.userHandler.HardDeleteUser)
+	apiV1.Patch("/users", s.userHandler.UpdateSelf)
+	apiV1.Delete("/users", s.userHandler.SoftDeleteSelf)
+
 }
