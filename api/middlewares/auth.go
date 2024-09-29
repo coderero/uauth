@@ -209,7 +209,6 @@ func (a *authMiddleware) AuthRouteMiddleware(c *fiber.Ctx) error {
 				},
 			})
 		} else {
-			log.Print("Logged in")
 			return c.Next()
 		}
 	}

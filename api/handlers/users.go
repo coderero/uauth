@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 
 	"github.com/coderero/paas-project/api/models"
 	"github.com/coderero/paas-project/internal/services"
@@ -132,6 +133,39 @@ func (u *UserHandler) CreateUser(ctx *fiber.Ctx) error {
 	})
 }
 
+// GetSelf returns the current user.
+func (u *UserHandler) GetSelf(ctx *fiber.Ctx) error {
+	sub, ok := ctx.Locals("user").(string)
+	if !ok {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
+			Status:  fiber.StatusUnauthorized,
+			Message: "unauthorized",
+		})
+	}
+
+	user, err := u.userService.GetByEmail(sub)
+	if err != nil {
+		return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+			Status:  fiber.StatusNotFound,
+			Message: "user not found",
+		})
+	}
+
+	safeUser := safeUserResponse{
+		ID:        user.ID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Username:  user.Username,
+		Email:     user.Email,
+	}
+
+	return ctx.JSON(types.APIResponse{
+		Status:  fiber.StatusOK,
+		Message: "user",
+		Details: safeUser,
+	})
+}
+
 // GetUserByID returns a user by its ID.
 func (u *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 	id, err := ctx.ParamsInt("id")
@@ -161,7 +195,6 @@ func (u *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 	return ctx.JSON(safeUser)
 }
 
-// GetUserByUsername returns a user by its username.
 func (u *UserHandler) GetUserByUsername(ctx *fiber.Ctx) error {
 	username := ctx.Params("username")
 
@@ -184,7 +217,7 @@ func (u *UserHandler) GetUserByUsername(ctx *fiber.Ctx) error {
 	return ctx.JSON(safeUser)
 }
 
-// GetUserByEmail returns a user by its email.
+// GetByEmail returns a user by its email.
 func (u *UserHandler) GetUserByEmail(ctx *fiber.Ctx) error {
 	email := ctx.Params("email")
 
@@ -204,25 +237,32 @@ func (u *UserHandler) GetUserByEmail(ctx *fiber.Ctx) error {
 		Email:     user.Email,
 	}
 
-	return ctx.JSON(safeUser)
+	return ctx.JSON(types.APIResponse{
+		Status:  fiber.StatusOK,
+		Message: "user",
+		Details: safeUser,
+	})
 }
 
-// GetAllActive returns all active users.
-func (u *UserHandler) GetAllActive(ctx *fiber.Ctx) error {
-	page := ctx.QueryInt("page")
-	limit := ctx.QueryInt("limit")
+// GetUsers returns all users but only can be used by admin or superadmin.
+func (u *UserHandler) GetUsers(ctx *fiber.Ctx) error {
+	var filters types.UserAccessFilter
 
+	if err := ctx.QueryParser(&filters); err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "validation error",
+			Details: utils.ProcessError(err),
+		})
+	}
+
+	log.Printf("Filters: %+v", filters)
 	sub, ok := ctx.Locals("user").(string)
 	if !ok {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
 			Status:  fiber.StatusUnauthorized,
 			Message: "unauthorized",
 		})
-	}
-
-	if page < 1 || limit < 10 {
-		page = 1
-		limit = 10
 	}
 
 	currentUser, err := u.userService.GetByEmail(sub)
@@ -232,203 +272,52 @@ func (u *UserHandler) GetAllActive(ctx *fiber.Ctx) error {
 			Message: "unauthorized",
 		})
 	}
-	role := currentUser.GetRole()
 
-	if role != "admin" && role != "superadmin" {
+	if filters.Empty() {
+		filters = types.UserAccessFilter{
+			Every:      true,
+			Admin:      currentUser.GetRole() == "admin" || currentUser.GetRole() == "superadmin",
+			Superadmin: currentUser.GetRole() == "superadmin",
+		}
+	}
+
+	// if the user is nither admin nor superadmin and the filters for admin or superadmin are true
+	// then return unauthorized
+	if currentUser.GetRole() != "admin" && currentUser.GetRole() != "superadmin" && (filters.Admin || filters.Superadmin) {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
 			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
+			Message: "insufficient permissions",
+		})
+	} else if currentUser.GetRole() == "admin" && filters.Superadmin {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
+			Status:  fiber.StatusUnauthorized,
+			Message: "insufficient permissions",
 		})
 	}
 
-	users, err := u.userService.GetAllActive(role, page, limit)
+	log.Printf("Filters: %+v", filters)
+
+	users, err := u.userService.GetWithFilters(&filters)
 	if err != nil {
-		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
-			Status:  fiber.StatusForbidden,
-			Message: "invalid permission",
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "failed to get users",
 		})
 	}
 
 	var safeUsers []safeUserResponse
 	for _, user := range users {
-		safeUser := safeUserResponse{
+		safeUsers = append(safeUsers, safeUserResponse{
 			ID:        user.ID,
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
 			Username:  user.Username,
 			Email:     user.Email,
-		}
-		safeUsers = append(safeUsers, safeUser)
-	}
-
-	return ctx.JSON(safeUsers)
-}
-
-// GetAllInactive returns all inactive users.
-func (u *UserHandler) GetAllInactive(ctx *fiber.Ctx) error {
-	page := ctx.QueryInt("page")
-	limit := ctx.QueryInt("limit")
-
-	sub, ok := ctx.Locals("user").(string)
-	if !ok {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
 		})
 	}
 
-	if page < 1 || limit < 10 {
-		page = 1
-		limit = 10
-	}
-
-	currentUser, err := u.userService.GetByEmail(sub)
-	if err != nil {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-	role := currentUser.GetRole()
-
-	if role != "admin" && role != "superadmin" {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-
-	users, err := u.userService.GetAllInactive(role, page, limit)
-	if err != nil {
-		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
-			Status:  fiber.StatusForbidden,
-			Message: "invalid permission",
-		})
-	}
-
-	var safeUsers []safeUserResponse
-	for _, user := range users {
-		safeUser := safeUserResponse{
-			ID:        user.ID,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Username:  user.Username,
-			Email:     user.Email,
-		}
-		safeUsers = append(safeUsers, safeUser)
-	}
-
-	return ctx.JSON(safeUsers)
-}
-
-func (u *UserHandler) GetAllDeleted(ctx *fiber.Ctx) error {
-	page := ctx.QueryInt("page")
-	limit := ctx.QueryInt("limit")
-
-	sub, ok := ctx.Locals("user").(string)
-	if !ok {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-
-	if page < 1 || limit < 10 {
-		page = 1
-		limit = 10
-	}
-
-	currentUser, err := u.userService.GetByEmail(sub)
-	if err != nil {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-	role := currentUser.GetRole()
-
-	if role != "admin" && role != "superadmin" {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-
-	users, err := u.userService.GetAllDeleted(role, page, limit)
-	if err != nil {
-		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
-			Status:  fiber.StatusForbidden,
-			Message: "invalid permission",
-		})
-	}
-
-	var safeUsers []safeUserResponse
-	for _, user := range users {
-		safeUser := safeUserResponse{
-			ID:        user.ID,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Username:  user.Username,
-			Email:     user.Email,
-		}
-		safeUsers = append(safeUsers, safeUser)
-	}
-
-	return ctx.JSON(safeUsers)
-}
-
-// GetAll returns all users.
-func (u *UserHandler) GetAll(ctx *fiber.Ctx) error {
-	page := ctx.QueryInt("page")
-	limit := ctx.QueryInt("limit")
-
-	sub, ok := ctx.Locals("user").(string)
-	if !ok {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-
-	if page < 1 || limit < 10 {
-		page = 1
-		limit = 10
-	}
-
-	currentUser, err := u.userService.GetByEmail(sub)
-	if err != nil {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-	role := currentUser.GetRole()
-
-	if role != "admin" && role != "superadmin" {
-		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
-			Status:  fiber.StatusUnauthorized,
-			Message: "unauthorized",
-		})
-	}
-
-	users, err := u.userService.GetAll(role, page, limit)
-	if err != nil {
-		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
-			Status:  fiber.StatusForbidden,
-			Message: "invalid permission",
-		})
-	}
-
-	var safeUsers []safeUserResponse
-	for _, user := range users {
-		safeUser := safeUserResponse{
-			ID:        user.ID,
-			FirstName: user.FirstName,
-			LastName:  user.LastName,
-			Username:  user.Username,
-			Email:     user.Email,
-		}
-		safeUsers = append(safeUsers, safeUser)
+	if safeUsers == nil {
+		safeUsers = []safeUserResponse{}
 	}
 
 	return ctx.JSON(types.APIResponse{

@@ -7,6 +7,7 @@ import (
 
 	"github.com/coderero/paas-project/api/models"
 	"github.com/coderero/paas-project/internal/database"
+	"github.com/coderero/paas-project/internal/types"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -27,17 +28,8 @@ type UserService interface {
 	// GetByEmail returns a user by its email.
 	GetByEmail(email string) (*models.User, error)
 
-	// GetAllActive returns all active users.
-	GetAllActive(string, int, int) ([]*models.User, error)
-
-	// GetAllInactive returns all inactive users.
-	GetAllInactive(string, int, int) ([]*models.User, error)
-
-	// GetAllDeleted returns all deleted users.
-	GetAllDeleted(string, int, int) ([]*models.User, error)
-
-	// GetAll returns all users.
-	GetAll(string, int, int) ([]*models.User, error)
+	// GetWithFilters returns a user with the given filters.
+	GetWithFilters(filters *types.UserAccessFilter) ([]*models.User, error)
 
 	// Update updates a user.
 	Update(user *models.User) error
@@ -68,9 +60,12 @@ func (u *userServicer) Create(user *models.User) (int, error) {
 		_, err := u.userRepo.GetUserByUsername(user.Username)
 		if !errors.Is(err, sql.ErrNoRows) {
 			usernameExists = true
+			return nil
+		} else if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		} else {
+			return err
 		}
-
-		return err
 	})
 	g.Go(func() error {
 		_, err := u.userRepo.GetUserByEmail(user.Email)
@@ -110,36 +105,8 @@ func (u *userServicer) GetByEmail(email string) (*models.User, error) {
 	return u.userRepo.GetUserByEmail(email)
 }
 
-func (u *userServicer) GetAllActive(permission string, page, limit int) ([]*models.User, error) {
-	if permission != "admin" && permission != "superadmin" {
-		return nil, ErrInvalidPermission
-	}
-
-	return u.userRepo.GetUsers(page, limit, database.OptionalArgs{Active: true, Admin: permission == "admin" || permission == "superadmin", Superadmin: permission == "superadmin"})
-}
-
-func (u *userServicer) GetAllInactive(permission string, page, limit int) ([]*models.User, error) {
-	if permission != "admin" && permission != "superadmin" {
-		return nil, ErrInvalidPermission
-	}
-
-	return u.userRepo.GetUsers(page, limit, database.OptionalArgs{Active: false, Admin: permission == "admin" || permission == "superadmin", Superadmin: permission == "superadmin"})
-}
-
-func (u *userServicer) GetAllDeleted(permission string, page, limit int) ([]*models.User, error) {
-	if permission != "admin" && permission != "superadmin" {
-		return nil, ErrInvalidPermission
-	}
-
-	return u.userRepo.GetUsers(page, limit, database.OptionalArgs{Deleted: true, Admin: permission == "admin" || permission == "superadmin", Superadmin: permission == "superadmin"})
-}
-
-func (u *userServicer) GetAll(permission string, page, limit int) ([]*models.User, error) {
-	if permission != "admin" && permission != "superadmin" {
-		return nil, ErrInvalidPermission
-	}
-
-	return u.userRepo.GetUsers(page, limit, database.OptionalArgs{Admin: permission == "admin" || permission == "superadmin", Superadmin: permission == "superadmin", Active: true, Deleted: true})
+func (u *userServicer) GetWithFilters(filters *types.UserAccessFilter) ([]*models.User, error) {
+	return u.userRepo.GetUsers(filters)
 }
 
 func (u *userServicer) Update(user *models.User) error {

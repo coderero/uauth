@@ -32,6 +32,9 @@ var (
 	// ErrUserNotFound is the error returned when a user is not found.
 	ErrUserNotFound = errors.New("user not found")
 
+	// ErrUserNotActive is the error returned when a user is not active.
+	ErrUserNotActive = errors.New("user not active")
+
 	// ErrInvalidPassword is the error returned when a password is invalid.
 	ErrInvalidPassword = errors.New("invalid password")
 
@@ -116,6 +119,10 @@ func (s *authService) Login(ctx context.Context, email, password string) (*types
 		return nil, 0, ErrUserNotFound
 	}
 
+	if !u.IsActive {
+		return nil, 0, ErrUserNotActive
+	}
+
 	// Compare the password
 	if err := s.cryptService.Compare(password, u.Password); err != nil {
 		return nil, 0, ErrInvalidPassword
@@ -132,20 +139,22 @@ func (s *authService) Login(ctx context.Context, email, password string) (*types
 func (s *authService) Register(ctx context.Context, user *models.User) (*types.Tokens, int, error) {
 	// Get the user by email and username
 	g, _ := errgroup.WithContext(ctx)
-	var emailExists, usernameExists bool
+	var emailExists, usernameExists bool = true, true
 	g.Go(func() error {
 		var err error
 		_, err = s.userRepository.GetUserByEmail(user.Email)
-		if !errors.Is(err, sql.ErrNoRows) {
-			emailExists = true
+		if errors.Is(err, sql.ErrNoRows) {
+			emailExists = false
+			return nil
 		}
 		return err
 	})
 	g.Go(func() error {
 		var err error
 		_, err = s.userRepository.GetUserByUsername(user.Username)
-		if !errors.Is(err, sql.ErrNoRows) {
-			usernameExists = true
+		if errors.Is(err, sql.ErrNoRows) {
+			usernameExists = false
+			return nil
 		}
 		return err
 	})
@@ -164,6 +173,7 @@ func (s *authService) Register(ctx context.Context, user *models.User) (*types.T
 	}
 
 	user.Password = hash
+	user.IsActive = true
 
 	// Save the user in the database
 	id, err := s.userRepository.CreateUser(user)

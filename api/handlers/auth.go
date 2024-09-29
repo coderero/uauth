@@ -96,7 +96,7 @@ func (h *AuthHandler) Register(ctx *fiber.Ctx) error {
 			})
 		}
 
-		log.Print(err)
+		log.Print("error: ", err)
 		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
 			Status:  fiber.StatusInternalServerError,
 			Message: "something went wrong",
@@ -170,6 +170,13 @@ func (h *AuthHandler) Login(ctx *fiber.Ctx) error {
 			return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
 				Status:  fiber.StatusUnauthorized,
 				Message: "invalid password",
+			})
+		}
+
+		if errors.Is(err, services.ErrUserNotActive) {
+			return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
+				Status:  fiber.StatusUnauthorized,
+				Message: "user not active contact the admin",
 			})
 		}
 

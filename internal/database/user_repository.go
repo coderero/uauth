@@ -2,11 +2,12 @@ package database
 
 import (
 	"database/sql"
-	"errors"
 	"log"
 	"net"
 
 	"github.com/coderero/paas-project/api/models"
+	"github.com/coderero/paas-project/internal/types"
+	"github.com/coderero/paas-project/internal/utils"
 )
 
 type UserRepository interface {
@@ -14,10 +15,10 @@ type UserRepository interface {
 	CreateUser(user *models.User) (int, error)
 
 	// GetUser returns the user with the given ID.
-	GetUser(id int, optional ...OptionalArgs) (*models.User, error)
+	GetUser(id int) (*models.User, error)
 
 	// GetUsers returns all users.
-	GetUsers(page, limit int, optional ...OptionalArgs) ([]*models.User, error)
+	GetUsers(optional *types.UserAccessFilter) ([]*models.User, error)
 
 	// UpdateUser updates the user with the given ID.
 	UpdateUser(user *models.User) error
@@ -50,16 +51,6 @@ type UserRepository interface {
 	GetUsedPasswords(userID int) ([]*models.UsedPassword, error)
 }
 
-type OptionalArgs struct {
-	// Get all users, including deleted ones but remeber that the admin and superadmin
-	// flags need to be set to true to be able to get all users including the admin and superadmin users
-	All        bool
-	Admin      bool
-	Superadmin bool
-	Active     bool
-	Deleted    bool
-}
-
 // userService is the implementation of the UserService interface.
 type userRepository struct {
 	db *sql.DB
@@ -69,21 +60,6 @@ type userRepository struct {
 func NewUserRepository(db Service) UserRepository {
 	return &userRepository{
 		db: db.DB(),
-	}
-}
-
-func (s *userRepository) processOptionalArgs(query *string, agrs OptionalArgs) {
-	if agrs.Superadmin {
-		*query += " AND is_superadmin = true"
-	}
-	if agrs.Admin {
-		*query += " AND is_admin = true"
-	}
-	if agrs.Active {
-		*query += " AND is_active = true"
-	}
-	if agrs.Deleted {
-		*query += " AND deleted_at IS NOT NULL"
 	}
 }
 
@@ -98,47 +74,24 @@ func (s *userRepository) CreateUser(user *models.User) (int, error) {
 	return id, err
 }
 
-func (s *userRepository) GetUser(id int, optional ...OptionalArgs) (*models.User, error) {
+func (s *userRepository) GetUser(id int) (*models.User, error) {
 	var user models.User
 	query := `SELECT * FROM auth_users WHERE id = $1`
-
-	if len(optional) > 0 {
-		s.processOptionalArgs(&query, optional[0])
-	} else if len(optional) > 1 {
-		return nil, errors.New("only one optional argument is allowed")
-	} else {
-		query += " AND deleted_at IS NULL"
-	}
 
 	err := s.db.QueryRow(query, id).Scan(&user.ID, &user.FirstName, &user.LastName, &user.Username, &user.Email, &user.Password, &user.IsSuperadmin, &user.IsAdmin, &user.IsActive, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 	return &user, err
 }
 
-func (s *userRepository) GetUsers(page, limit int, optional ...OptionalArgs) ([]*models.User, error) {
-	// Ensure page and limit are valid
-	if page < 1 {
-		return nil, errors.New("page must be greater than 0")
+func (s *userRepository) GetUsers(optional *types.UserAccessFilter) ([]*models.User, error) {
+	// Build the SQL query
+	query, err := utils.BuildUserAccessSQL(optional)
+	if err != nil {
+		return nil, err
 	}
-	if limit < 1 {
-		return nil, errors.New("limit must be greater than 0")
-	}
-
-	query := `SELECT * FROM auth_users WHERE id > 0`
-	if len(optional) > 0 {
-		s.processOptionalArgs(&query, optional[0])
-	} else if len(optional) > 1 {
-		return nil, errors.New("only one optional argument is allowed")
-	} else {
-		query += " AND deleted_at IS NULL"
-	}
-	query += " ORDER BY created_at DESC LIMIT $1 OFFSET $2"
 
 	log.Printf("Query: %s", query)
 
-	// Calculate offset
-	offset := (page - 1) * limit
-
-	rows, err := s.db.Query(query, limit, offset)
+	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}

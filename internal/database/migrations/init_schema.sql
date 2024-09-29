@@ -101,32 +101,32 @@ CREATE TABLE "project_users"(
 ALTER TABLE
     "project_users" ADD PRIMARY KEY("id");
 ALTER TABLE
-    "project_user_task" ADD CONSTRAINT "project_user_task_task_id_foreign" FOREIGN KEY("task_id") REFERENCES "project_task"("id");
+    "project_user_task" ADD CONSTRAINT "project_user_task_task_id_foreign" FOREIGN KEY("task_id") REFERENCES "project_task"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_user_task" ADD CONSTRAINT "project_user_task_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id");
+    "project_user_task" ADD CONSTRAINT "project_user_task_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_task" ADD CONSTRAINT "project_task_project_id_foreign" FOREIGN KEY("project_id") REFERENCES "projects"("id");
+    "project_task" ADD CONSTRAINT "project_task_project_id_foreign" FOREIGN KEY("project_id") REFERENCES "projects"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_users" ADD CONSTRAINT "project_users_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id");
+    "project_users" ADD CONSTRAINT "project_users_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "roles_permissions" ADD CONSTRAINT "roles_permissions_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id");
+    "roles_permissions" ADD CONSTRAINT "roles_permissions_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_task" ADD CONSTRAINT "project_task_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id");
+    "project_task" ADD CONSTRAINT "project_task_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "auth_passwords" ADD CONSTRAINT "auth_passwords_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id");
+    "auth_passwords" ADD CONSTRAINT "auth_passwords_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_user_task" ADD CONSTRAINT "project_user_task_permission_id_foreign" FOREIGN KEY("permission_id") REFERENCES "roles_permissions"("id");
+    "project_user_task" ADD CONSTRAINT "project_user_task_permission_id_foreign" FOREIGN KEY("permission_id") REFERENCES "roles_permissions"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "auth_logs" ADD CONSTRAINT "auth_logs_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id");
+    "auth_logs" ADD CONSTRAINT "auth_logs_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "projects" ADD CONSTRAINT "projects_permission_id_foreign" FOREIGN KEY("permission_id") REFERENCES "roles_permissions"("id");
+    "projects" ADD CONSTRAINT "projects_permission_id_foreign" FOREIGN KEY("permission_id") REFERENCES "roles_permissions"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_user_task" ADD CONSTRAINT "project_user_task_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id");
+    "project_user_task" ADD CONSTRAINT "project_user_task_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_users" ADD CONSTRAINT "project_users_project_id_foreign" FOREIGN KEY("project_id") REFERENCES "projects"("id");
+    "project_users" ADD CONSTRAINT "project_users_project_id_foreign" FOREIGN KEY("project_id") REFERENCES "projects"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_roles" ADD CONSTRAINT "project_roles_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id");
+    "project_roles" ADD CONSTRAINT "project_roles_created_by_foreign" FOREIGN KEY("created_by") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "projects" ADD CONSTRAINT "projects_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id");
+    "projects" ADD CONSTRAINT "projects_user_id_foreign" FOREIGN KEY("user_id") REFERENCES "auth_users"("id") ON DELETE CASCADE;
 ALTER TABLE
-    "project_roles" ADD CONSTRAINT "project_roles_project_id_foreign" FOREIGN KEY("project_id") REFERENCES "projects"("id");
+    "project_roles" ADD CONSTRAINT "project_roles_project_id_foreign" FOREIGN KEY("project_id") REFERENCES "projects"("id") ON DELETE CASCADE;
