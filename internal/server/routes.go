@@ -35,7 +35,7 @@ func (s *Server) RegisterRoutes() {
 	apiV1.Get("/users/:id", s.userHandler.GetUserByID)
 	apiV1.Get("/users/email/:email", s.userHandler.GetUserByEmail)
 	apiV1.Get("/users/username/:username", s.userHandler.GetUserByUsername)
-	apiV1.Put("/users/:id", s.userHandler.UpdateUser)
+	apiV1.Patch("/users/:id", s.userHandler.UpdateUser)
 	apiV1.Delete("/users/:id/soft", s.userHandler.SoftDeleteUser)
 	apiV1.Delete("/users/:id/hard", s.userHandler.HardDeleteUser)
 	apiV1.Patch("/users", s.userHandler.UpdateSelf)

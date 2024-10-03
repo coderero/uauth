@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -49,4 +50,21 @@ func ProcessError(err error) fiber.Map {
 	return fiber.Map{
 		"error": errMsg,
 	}
+}
+
+// BoolToString is a function that converts a boolean value to a string
+func BoolToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+// ParseURLValue is a function that parses the URL values and returns the the string value
+func ParseURLValue(value string) (string, error) {
+	value, err := url.QueryUnescape(value)
+	if err != nil {
+		return "", err
+	}
+	return value, nil
 }

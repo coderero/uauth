@@ -2,21 +2,25 @@ package types
 
 type UserAccessFilter struct {
 	// Every filters all users
-	Every bool `json:"-" query:"-"`
+	Every bool `query:"-"`
 	// Active filters the active users
-	Active bool `json:"active" query:"active"`
+	Active string `query:"active"`
 	// Deleted filters the deleted users
-	Deleted bool `json:"deleted" query:"deleted"`
+	Deleted string `query:"deleted"`
 	// Admin filters the admin users
-	Admin bool `json:"admin" query:"admin"`
+	Admin string `query:"admin"`
 	// Superadmin filters the superadmin users
-	Superadmin bool `json:"superadmin" query:"superadmin"`
+	Superadmin string `query:"superadmin"`
+	// SortBy sorts the users by the given field
+	SortBy string `query:"sort_by"`
+	// Order orders the users by the given order
+	Order string `query:"order"`
 	// Pagination
-	Page int `json:"page" query:"page"`
+	Page int `query:"page"`
 	// Limit
-	Limit int `json:"limit" query:"limit"`
+	Limit int `query:"limit"`
 }
 
 func (u *UserAccessFilter) Empty() bool {
-	return !u.Every && !u.Active && !u.Deleted && !u.Admin && !u.Superadmin && u.Page == 0 && u.Limit == 0
+	return u.Active == "" && u.Deleted == "" && u.Admin == "" && u.Superadmin == "" && u.SortBy == "" && u.Order == "" && u.Page == 0 && u.Limit == 0
 }

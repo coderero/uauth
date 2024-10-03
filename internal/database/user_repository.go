@@ -2,7 +2,6 @@ package database
 
 import (
 	"database/sql"
-	"log"
 	"net"
 
 	"github.com/coderero/paas-project/api/models"
@@ -89,8 +88,6 @@ func (s *userRepository) GetUsers(optional *types.UserAccessFilter) ([]*models.U
 		return nil, err
 	}
 
-	log.Printf("Query: %s", query)
-
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -115,7 +112,7 @@ func (s *userRepository) GetUsers(optional *types.UserAccessFilter) ([]*models.U
 }
 
 func (s *userRepository) UpdateUser(user *models.User) error {
-	_, err := s.db.Exec("UPDATE auth_users SET first_name = COALESCE($1, first_name), last_name = COALESCE($2, last_name), username = COALESCE($3, username), email = COALESCE($4, email), password = COALESCE($5, password), is_superadmin = COALESCE($6, is_superadmin), is_admin = COALESCE($7, is_admin), is_active = COALESCE($8, is_active) WHERE id = $9", user.FirstName, user.LastName, user.Username, user.Email, user.Password, user.IsSuperadmin, user.IsAdmin, user.IsActive, user.ID)
+	_, err := s.db.Exec("UPDATE auth_users SET first_name = COALESCE(NULLIF($1, ''), first_name), last_name = COALESCE(NULLIF($2, ''), last_name), username = COALESCE(NULLIF($3, ''), username), email = COALESCE(NULLIF($4, ''), email), password = COALESCE(NULLIF($5, ''), password), is_superadmin = COALESCE(NULLIF($6, is_superadmin), is_superadmin), is_admin = COALESCE(NULLIF($7, is_admin), is_admin), is_active = COALESCE(NULLIF($8, is_active), is_active) WHERE id = $9", user.FirstName, user.LastName, user.Username, user.Email, user.Password, user.IsSuperadmin, user.IsAdmin, user.IsActive, user.ID)
 	return err
 }
 

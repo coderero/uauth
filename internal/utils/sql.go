@@ -26,14 +26,14 @@ func BuildUserAccessSQL(filter *types.UserAccessFilter) (string, error) {
 
 	// Handle 'Every' flag separately
 	if filter.Every {
-		if filter.Admin {
+		if filter.Admin != "" && filter.Admin == "true" {
 			conditions = append(conditions, "is_admin = true OR is_admin = false")
 			filterCount++
 		} else {
 			conditions = append(conditions, "is_admin = false")
 			filterCount++
 		}
-		if filter.Superadmin {
+		if filter.Superadmin != "" && filter.Superadmin == "true" {
 			conditions = append(conditions, "is_superadmin = true OR is_superadmin = false")
 			filterCount++
 		} else {
@@ -45,27 +45,20 @@ func BuildUserAccessSQL(filter *types.UserAccessFilter) (string, error) {
 		return baseQuery, nil
 	}
 
-	// Track the number of filters applied and ensure it's within the limit
-	if filter.Active {
-		conditions = append(conditions, "is_active = true")
-		filterCount++
-	}
-	if filter.Deleted {
-		conditions = append(conditions, "deleted_at IS NOT NULL")
-		filterCount++
-	}
-	if filter.Admin {
-		conditions = append(conditions, "is_admin = true")
-		filterCount++
-	}
-	if filter.Superadmin {
-		conditions = append(conditions, "is_superadmin = true")
-		filterCount++
+	filters := map[string]string{
+		"Active":     getConditions("is_active", filter.Active),
+		"Deleted":    getConditions("deleted_at", filter.Deleted),
+		"Admin":      getConditions("is_admin", filter.Admin),
+		"Superadmin": getConditions("is_superadmin", filter.Superadmin),
 	}
 
-	// Ensure no more than 3 filters are applied
-	if filterCount > 3 {
-		return "", ErrFillterOverflow
+	for _, v := range filters {
+		if v != "" {
+			conditions = append(conditions, v)
+			filterCount++
+		} else {
+			continue
+		}
 	}
 
 	// Build the final SQL query based on the filters
@@ -89,7 +82,43 @@ func BuildUserAccessSQL(filter *types.UserAccessFilter) (string, error) {
 		filter.Limit = maxLimit
 	}
 
+	orderField, order := SortPatternParser(filter.SortBy, filter.Order)
 	offset := (filter.Page - 1) * filter.Limit
-	baseQuery = fmt.Sprintf("%s ORDER BY created_at DESC LIMIT %d OFFSET %d", baseQuery, filter.Limit, offset)
+	baseQuery = fmt.Sprintf("%s ORDER BY %s %s LIMIT %d OFFSET %d", baseQuery, orderField, order, filter.Limit, offset)
 	return baseQuery, nil
+}
+
+// getConditions for the boolean fields
+func getConditions(field, value string) string {
+	switch value {
+	case "true":
+		return fmt.Sprintf("%s = true", field)
+	case "false":
+		return fmt.Sprintf("%s = false", field)
+	default:
+		return ""
+	}
+}
+
+// Sort Pattern parser for the sort_by and order fields in the filter if the
+// requested field is not allowed it will return the default sort field and order
+// if the order is not "asc" or "desc" it will return the default order to
+// prevent SQL injection
+func SortPatternParser(sortBy, order string) (string, string) {
+	allowedFields := map[string]bool{
+		"created_at": true,
+		"updated_at": true,
+		"email":      true,
+		"username":   true,
+	}
+
+	if !allowedFields[sortBy] {
+		return "created_at", "desc"
+	}
+
+	if order != "asc" && order != "desc" {
+		return sortBy, "desc"
+	}
+
+	return sortBy, order
 }

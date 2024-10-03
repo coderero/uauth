@@ -36,6 +36,7 @@ type userUpdateRequest struct {
 
 type adminUpdateUserRequest struct {
 	userUpdateRequest
+	Privilage    bool `json:"privilaged"`
 	IsAdmin      bool `json:"is_admin"`
 	IsActive     bool `json:"is_active"`
 	IsSuperadmin bool `json:"is_superadmin"`
@@ -196,7 +197,15 @@ func (u *UserHandler) GetUserByID(ctx *fiber.Ctx) error {
 }
 
 func (u *UserHandler) GetUserByUsername(ctx *fiber.Ctx) error {
-	username := ctx.Params("username")
+	rawUsername := ctx.Params("username")
+	// Parse the url encoded username
+	username, err := utils.ParseURLValue(rawUsername)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "invalid username",
+		})
+	}
 
 	user, err := u.userService.GetByUsername(username)
 	if err != nil {
@@ -214,12 +223,24 @@ func (u *UserHandler) GetUserByUsername(ctx *fiber.Ctx) error {
 		Email:     user.Email,
 	}
 
-	return ctx.JSON(safeUser)
+	return ctx.JSON(types.APIResponse{
+		Status:  fiber.StatusOK,
+		Message: "user",
+		Details: safeUser,
+	})
 }
 
 // GetByEmail returns a user by its email.
 func (u *UserHandler) GetUserByEmail(ctx *fiber.Ctx) error {
-	email := ctx.Params("email")
+	rawEmail := ctx.Params("email")
+	// Parse the url encoded email
+	email, err := utils.ParseURLValue(rawEmail)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "invalid email",
+		})
+	}
 
 	user, err := u.userService.GetByEmail(email)
 	if err != nil {
@@ -276,29 +297,28 @@ func (u *UserHandler) GetUsers(ctx *fiber.Ctx) error {
 	if filters.Empty() {
 		filters = types.UserAccessFilter{
 			Every:      true,
-			Admin:      currentUser.GetRole() == "admin" || currentUser.GetRole() == "superadmin",
-			Superadmin: currentUser.GetRole() == "superadmin",
+			Admin:      utils.BoolToString(currentUser.GetRole() == "admin" || currentUser.GetRole() == "superadmin"),
+			Superadmin: utils.BoolToString(currentUser.GetRole() == "superadmin"),
 		}
 	}
 
 	// if the user is nither admin nor superadmin and the filters for admin or superadmin are true
 	// then return unauthorized
-	if currentUser.GetRole() != "admin" && currentUser.GetRole() != "superadmin" && (filters.Admin || filters.Superadmin) {
+	if (currentUser.GetRole() != "admin" && currentUser.GetRole() != "superadmin") && (filters.Admin == "true" || filters.Superadmin == "true" || filters.Deleted == "true") {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
 			Status:  fiber.StatusUnauthorized,
 			Message: "insufficient permissions",
 		})
-	} else if currentUser.GetRole() == "admin" && filters.Superadmin {
+	} else if currentUser.GetRole() == "admin" && filters.Superadmin == "true" {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
 			Status:  fiber.StatusUnauthorized,
 			Message: "insufficient permissions",
 		})
 	}
 
-	log.Printf("Filters: %+v", filters)
-
 	users, err := u.userService.GetWithFilters(&filters)
 	if err != nil {
+		log.Printf("Error: %v", err)
 		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
 			Status:  fiber.StatusBadRequest,
 			Message: "failed to get users",
@@ -378,7 +398,7 @@ func (u *UserHandler) UpdateUser(ctx *fiber.Ctx) error {
 		})
 	}
 
-	if req.Email == "" || req.Username == "" || req.FirstName == "" || req.LastName == "" || !req.IsAdmin || !req.IsActive || !req.IsSuperadmin {
+	if req.Email == "" && req.Username == "" && req.FirstName == "" && req.LastName == "" && !req.IsAdmin && !req.IsActive && !req.IsSuperadmin {
 		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
 			Status:  fiber.StatusBadRequest,
 			Message: "any one of the fields is required",
@@ -397,6 +417,11 @@ func (u *UserHandler) UpdateUser(ctx *fiber.Ctx) error {
 	user.LastName = req.LastName
 	user.Username = req.Username
 	user.Email = req.Email
+	if req.Privilage {
+		user.IsAdmin = req.IsAdmin
+		user.IsActive = req.IsActive
+		user.IsSuperadmin = req.IsSuperadmin
+	}
 
 	if err := u.userService.Update(user); err != nil {
 		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
@@ -494,6 +519,12 @@ func (u *UserHandler) SoftDeleteUser(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
 			Status:  fiber.StatusUnauthorized,
 			Message: "unauthorized",
+		})
+	}
+	if currentUser.Email == sub && currentUser.ID == id {
+		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
+			Status:  fiber.StatusForbidden,
+			Message: "cannot delete self on this endpoint",
 		})
 	}
 	role := currentUser.GetRole()
@@ -601,6 +632,12 @@ func (u *UserHandler) HardDeleteUser(ctx *fiber.Ctx) error {
 			Message: "unauthorized",
 		})
 	}
+	if currentUser.Email == sub && currentUser.ID == id {
+		return ctx.Status(fiber.StatusForbidden).JSON(types.APIResponse{
+			Status:  fiber.StatusForbidden,
+			Message: "cannot delete self on this endpoint",
+		})
+	}
 	role := currentUser.GetRole()
 
 	if role != "superadmin" {
@@ -611,6 +648,7 @@ func (u *UserHandler) HardDeleteUser(ctx *fiber.Ctx) error {
 	}
 
 	if err := u.userService.HardDelete(id); err != nil {
+		log.Printf("Error: %v", err)
 		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
 			Status:  fiber.StatusBadRequest,
 			Message: "something went wrong",

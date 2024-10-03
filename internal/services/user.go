@@ -71,9 +71,12 @@ func (u *userServicer) Create(user *models.User) (int, error) {
 		_, err := u.userRepo.GetUserByEmail(user.Email)
 		if !errors.Is(err, sql.ErrNoRows) {
 			emailExists = true
+			return nil
+		} else if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		} else {
+			return err
 		}
-
-		return err
 	})
 
 	if err := g.Wait(); err != nil {
@@ -116,17 +119,23 @@ func (u *userServicer) Update(user *models.User) error {
 		_, err := u.userRepo.GetUserByUsername(user.Username)
 		if !errors.Is(err, sql.ErrNoRows) {
 			usernameExists = true
+			return nil
+		} else if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		} else {
+			return err
 		}
-
-		return err
 	})
 	g.Go(func() error {
 		_, err := u.userRepo.GetUserByEmail(user.Email)
 		if !errors.Is(err, sql.ErrNoRows) {
 			emailExists = true
+			return nil
+		} else if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		} else {
+			return err
 		}
-
-		return err
 	})
 
 	if err := g.Wait(); err != nil {
