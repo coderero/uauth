@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/coderero/paas-project/api/models"
+	"github.com/coderero/paas-project/internal/cache"
 	"github.com/coderero/paas-project/internal/database"
 	"github.com/coderero/paas-project/internal/types"
 	"github.com/google/uuid"
@@ -55,12 +56,21 @@ var (
 
 	// ErrFailedToSendEmail is the error returned when an email cannot be sent.
 	ErrFailedToSendEmail = errors.New("failed to send email")
+
+	// ErrTokenGeneration is the error returned when a token cannot be generated.
+	ErrTokenGeneration = errors.New("failed to generate token")
 )
 
 // AuthServicer is the interface that provides authentication methods.
 type AuthServicer interface {
 	// Register registers a user with the given email and password.
 	Register(ctx context.Context, user *models.User) (*types.Tokens, int, error)
+
+	// RegenEmailVerification regenerates the email verification token for the user with the given email.
+	RegenEmailVerification(ctx context.Context, email string) error
+
+	// VerifyEmail verifies the email for the user with the given token.
+	VerifyEmail(ctx context.Context, token string) error
 
 	// Login logs in a user with the given email and password.
 	Login(ctx context.Context, email, password string) (*types.Tokens, int, error)
@@ -84,7 +94,7 @@ type AuthServicer interface {
 	Logout(ctx context.Context, refreshToken, accessToken string) error
 }
 
-type resetPasswordPayload struct {
+type payload struct {
 	ID     uuid.UUID `json:"id"`
 	Email  string    `json:"email"`
 	Expiry int64     `json:"expiry"`
@@ -93,15 +103,17 @@ type resetPasswordPayload struct {
 type authService struct {
 	cryptService   CryptService
 	userRepository database.UserRepository
+	userCache      cache.UserCache
 	jwtService     JwtService
 	smtpService    SmtpService
 }
 
 // NewAuthService creates a new authentication service.
-func NewAuthService(crypt CryptService, userRepository database.UserRepository, jwt JwtService) AuthServicer {
+func NewAuthService(crypt CryptService, userRepository database.UserRepository, userCache cache.UserCache, jwt JwtService) AuthServicer {
 	return &authService{
 		cryptService:   crypt,
 		userRepository: userRepository,
+		userCache:      userCache,
 		jwtService:     jwt,
 		smtpService:    NewSmtpService(),
 	}
@@ -173,11 +185,42 @@ func (s *authService) Register(ctx context.Context, user *models.User) (*types.T
 	}
 
 	user.Password = hash
-	user.IsActive = true
 
-	// Save the user in the database
-	id, err := s.userRepository.CreateUser(user)
-	if err != nil {
+	var errgroup errgroup.Group
+	var id int
+	errgroup.Go(func() error {
+		var err error
+		id, err = s.userRepository.CreateUser(user)
+		return err
+	})
+
+	errgroup.Go(func() error {
+		if !user.IsActive {
+			if err := s.userCache.SetInactiveUser(user.Email); err != nil {
+				return err
+			}
+		}
+
+		token, err := s.encryptRPP(&payload{
+			ID:     uuid.New(),
+			Email:  user.Email,
+			Expiry: time.Now().Add(time.Hour).Unix(),
+		})
+
+		if err != nil {
+			return ErrTokenGeneration
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+
+		if err := s.smtpService.Send(ctx, user.Email, "Verify Email", fmt.Sprintf("Click the link to verify your email: http://localhost:3000/verify-email?token=%s", token)); err != nil {
+			return ErrFailedToSendEmail
+		}
+		return nil
+	})
+
+	if err := errgroup.Wait(); err != nil {
 		return nil, 0, err
 	}
 
@@ -187,6 +230,68 @@ func (s *authService) Register(ctx context.Context, user *models.User) (*types.T
 	}
 
 	return tokens, id, nil
+}
+
+func (s *authService) RegenEmailVerification(ctx context.Context, email string) error {
+	// Find the user in the database
+	u, err := s.userRepository.GetUserByEmail(email)
+	if err != nil || u == nil {
+		return ErrUserNotFound
+	}
+
+	// Generate Verification Token
+	t, err := s.encryptRPP(&payload{
+		ID:     uuid.New(),
+		Email:  u.Email,
+		Expiry: time.Now().Add(time.Hour).Unix(),
+	})
+
+	if err != nil {
+		return ErrFailedToGenerateToken
+	}
+
+	// Context timeout for the email sending
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	// Send the email
+	if err := s.smtpService.Send(ctx, u.Email, "Verify Email", fmt.Sprintf("Click the link to verify your email: http://localhost:3000/verify-email?token=%s", t)); err != nil {
+		return ErrFailedToGenerateToken
+	}
+
+	return nil
+}
+
+func (s *authService) VerifyEmail(ctx context.Context, token string) error {
+	// Decrypt the token
+	p, err := s.decryptRPP(token)
+	if err != nil {
+		return ErrInvalidToken
+	}
+
+	// Check if the token is expired
+	if time.Now().Unix() > p.Expiry {
+		return ErrInvalidToken
+	}
+
+	// Find the user in the database
+	u, err := s.userRepository.GetUserByEmail(p.Email)
+	if err != nil || u == nil {
+		return ErrUserNotFound
+	}
+
+	// Activate the user
+	u.IsActive = true
+	if err := s.userRepository.UpdateUser(u); err != nil {
+		return err
+	}
+
+	// Remove the inactive user from the cache
+	if err := s.userCache.RemoveInactiveUser(u.Email); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *authService) Logout(ctx context.Context, refreshToken, accessToken string) error {
@@ -238,7 +343,7 @@ func (s *authService) ResetPassword(ctx context.Context, email string) error {
 	}
 
 	// Generate a reset password payload
-	payload := resetPasswordPayload{
+	payload := payload{
 		ID:     uuid.New(),
 		Email:  email,
 		Expiry: time.Now().Add(time.Hour).Unix(),
@@ -389,7 +494,7 @@ func (a *authService) generateTokens(ctx context.Context, s *authService, user *
 }
 
 // encryptRPP encrypts the reset password payload.
-func (s *authService) encryptRPP(payload *resetPasswordPayload) (string, error) {
+func (s *authService) encryptRPP(payload *payload) (string, error) {
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return empty, err
@@ -413,7 +518,7 @@ func (s *authService) encryptRPP(payload *resetPasswordPayload) (string, error) 
 }
 
 // decryptRPP decrypts the reset password payload.
-func (s *authService) decryptRPP(encrypted string) (*resetPasswordPayload, error) {
+func (s *authService) decryptRPP(encrypted string) (*payload, error) {
 	// Decode the base64-encoded encrypted payload
 	ciphertext, err := base64.URLEncoding.DecodeString(encrypted)
 	if err != nil {
@@ -437,7 +542,7 @@ func (s *authService) decryptRPP(encrypted string) (*resetPasswordPayload, error
 	cfb.XORKeyStream(ciphertext, ciphertext)
 
 	// Unmarshal the decrypted JSON into a resetPasswordPayload struct
-	var payload resetPasswordPayload
+	var payload payload
 	err = json.Unmarshal(ciphertext, &payload)
 	if err != nil {
 		return nil, err

@@ -1,130 +1,47 @@
-# Codiman - Task Management System Server
-This is the server side of the Codiman Task Management System. It is built using Go,Fiber, PostgresSQL and Redis.
+# UAuth - User Authentication System
+
+UAuth is a user authentication system that allows you to create, update, delete, and authenticate users. A simple side project to demonstrate the use of user management and authentication using restful APIs.
 
 ## Features
-- User Authentication
-- Task Management
-- Role Management
+
+- Create a new user
+- Update user details
+- Delete a user
+- Authenticate a user
+
+## Technologies
+
+- Go
+- Fiber
+- PostgreSQL
+- Redis
+- Docker
+- Docker Compose
 
 ## Installation
+
 1. Clone the repository
-2. Install the dependencies
-3. Create a `.env` file and add the following environment variables
-```
-TOKEN_KEY= # A random string
-
-SMTP_HOST= # SMTP Server Host
-SMTP_PORT= # SMTP Server Port
-SMTP_FROM= # Email address to send emails from
-SMTP_USERNAME= # SMTP Username
-SMTP_PASSWORD= # SMTP Password
-
-DB_DATABASE= # Postgres Database Name
-DB_USERNAME= # Postgres Username
-DB_PASSWORD= # Postgres Password
-DB_HOST= # Postgres Host
-DB_PORT= # Postgres Port
-DB_SCHEMA= # Postgres Schema
-
-CACHE_ADDRESS= # Redis Address
-CACHE_PASSWORD= # Redis Password
-CACHE_DATABASE= # Redis Database
-```
-4. Run the server
-There are three ways to run the server as of now
-- Using Makefile
-```bash
-make run
-```
-- Using go run
-```bash
-go run cmd/api/main.go
-```
-- Using air (Hot Reload) - Install air using `go get -u github.com/cosmtrek/air`
-```bash
-air
-```
-
-## Directory Structure
-```
-.
-├── .air.toml
-├── .env
-├── .env.example
-├── .github
-│   └── workflow
-│       └── initigration.yaml
-├── .gitignore
-├── Makefile
-├── README.md
-├── api
-│   ├── handlers
-│   │   ├── auth.go
-│   │   └── csrf.go
-│   ├── middlewares
-│   │   └── auth.go
-│   └── models
-│       └── user.go
-├── bin
-│   ├── .gitkeep
-│   ├── api
-│   └── build-errors.log
-├── certs
-│   ├── .gitkeep
-│   ├── private.pem
-│   └── public.pem
-├── cmd
-│   └── api
-│       └── main.go
-├── docs
-│   └── .gitkeep
-├── go.mod
-├── go.sum
-├── internal
-│   ├── cache
-│   │   ├── cache.go
-│   │   └── jwt.go
-│   ├── database
-│   │   ├── database.go
-│   │   ├── migrations
-│   │   │   └── init_schema.sql
-│   │   └── user_repository.go
-│   ├── server
-│   │   ├── routes.go
-│   │   └── server.go
-│   ├── services
-│   │   ├── auth.go
-│   │   ├── crypt.go
-│   │   ├── jwt.go
-│   │   └── smtp.go
-│   ├── types
-│   │   ├── api.go
-│   │   ├── jwt.go
-│   │   └── premitive.go
-│   └── utils
-│       ├── basic.go
-│       ├── server.go
-│       └── validation.go
-├── static
-│   └── .gitkeep
-└── tests
-    └── .gitkeep
-```
+2. Run `docker-compose up` to start the application
+3. The application will be available at `http://localhost:8080`
 
 ## API Documentation
-The API documentation can be found [here](https://documenter.getpostman.com/view/11636691/TzJx8w7T)
+
+API documentation is coming soon.
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Author
-- [Mohit Sharma](github.com/coderere)
+
+- [Coderero - Mohit Sharma](https://github.com/coderero)
 
 ## Acknowledgements
-- [Fiber](github.com/gofiber/fiber)
-- [PGX](github.com/jackc/pgx)
-- [Redis](github.com/go-redis/redis)
 
-
-
-
+- [Golang](https://golang.org/)
+- [PostgreSQL](https://www.postgresql.org/)
+- [Fiber](https://gofiber.io/)
+- [Redis](https://redis.io/)
+- [Docker](https://www.docker.com/)
+- [Docker Compose](https://docs.docker.com/compose/)
+- [JWT](https://jwt.io/)

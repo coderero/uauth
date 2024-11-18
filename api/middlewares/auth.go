@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coderero/paas-project/internal/cache"
 	"github.com/coderero/paas-project/internal/services"
 	"github.com/coderero/paas-project/internal/types"
 	"github.com/gofiber/fiber/v2"
@@ -45,16 +46,23 @@ type tokenConfig struct {
 // authMiddleware is the implementation of the AuthMiddleware interface.
 type authMiddleware struct {
 	jwtService services.JwtService
+	userCache  cache.UserCache
 }
 
 // NewAuthMiddleware creates a new auth middleware.
-func NewAuthMiddleware(jwtService services.JwtService) AuthMiddleware {
+func NewAuthMiddleware(jwtService services.JwtService, userCache cache.UserCache) AuthMiddleware {
 	return &authMiddleware{
 		jwtService: jwtService,
+		userCache:  userCache,
 	}
 }
 
 func (a *authMiddleware) AuthMiddleware(c *fiber.Ctx) error {
+	if c.Path() == "/api/v1/csrf" {
+		log.Print("csrf")
+		return c.Next()
+	}
+
 	tokenConfig, err := a.areTokensValid(c)
 	if err != nil {
 		if errors.Is(err, errInvalidHeader) {
@@ -154,6 +162,22 @@ func (a *authMiddleware) AuthMiddleware(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
 			Status:  fiber.StatusUnauthorized,
 			Message: "unauthorized",
+		})
+	}
+
+	// Check if the user is active or not
+	isPresent, err := a.userCache.GetInactiveUser(sub)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(types.APIResponse{
+			Status:  fiber.StatusInternalServerError,
+			Message: "internal server error",
+		})
+	}
+
+	if isPresent {
+		return c.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "user has not verified email",
 		})
 	}
 

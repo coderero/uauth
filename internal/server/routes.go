@@ -11,6 +11,8 @@ func (s *Server) RegisterRoutes() {
 
 	/* Grouping Routes */
 	apiV1 := s.App.Group("/api/v1")
+	apiV1.Use(s.authMiddleWare.AuthMiddleware)
+
 	// CSRF Routes
 	apiV1.Get("/csrf", s.csrfHandler.CsrfMiddleware, s.csrfHandler.CSRF)
 
@@ -20,6 +22,8 @@ func (s *Server) RegisterRoutes() {
 
 	// Auth Routes
 	auth.Post("/register", s.authHandler.Register)
+	auth.Post("/resend-verification", s.authHandler.RegenEmailVerification)
+	auth.Post("/verify/:token", s.authHandler.VerifyEmail)
 	auth.Post("/login", s.authHandler.Login)
 	auth.Post("/change-password", s.authHandler.ChangePassword)
 	auth.Post("/reset-password", s.authHandler.ResetPassword)

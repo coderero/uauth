@@ -14,6 +14,7 @@ type User struct {
 	Username     string         `json:"username"`
 	Email        string         `json:"email"`
 	Password     string         `json:"password"`
+	IsVerified   bool           `json:"is_verified"`
 	IsSuperadmin bool           `json:"is_superadmin"`
 	IsAdmin      bool           `json:"is_admin"`
 	IsActive     bool           `json:"is_active"`

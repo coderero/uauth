@@ -1,7 +1,14 @@
 package cache
 
 import (
+	"context"
+	"encoding/json"
+	"sort"
+	"strconv"
+	"time"
+
 	"github.com/coderero/paas-project/api/models"
+	"github.com/coderero/paas-project/internal/utils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -47,37 +54,76 @@ func NewUserCache(client *redis.Client) UserCache {
 }
 
 func (u *userCache) Set(user *models.User) error {
-	return nil
+	usr, err := json.Marshal(user)
+	if err != nil {
+		return err
+	}
+
+	err = u.client.Set(context.Background(), strconv.Itoa(user.ID), usr, time.Hour*168).Err()
+	return err
 }
 
 func (u *userCache) Get(id int) (*models.User, error) {
-	return nil, nil
+	user, err := u.client.Get(context.Background(), strconv.Itoa(id)).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	var usr models.User
+	err = json.Unmarshal([]byte(user), &usr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &usr, nil
 }
 
 func (u *userCache) Delete(id int) error {
-	return nil
+	return u.client.Del(context.Background(), strconv.Itoa(id)).Err()
 }
 
 func (u *userCache) SetDeletedUser(sub string) error {
-	return nil
+	err := u.client.ZAdd(context.Background(), "deleted_users", redis.Z{
+		Score:  float64(time.Now().Unix()),
+		Member: sub,
+	}).Err()
+	return err
 }
 
 func (u *userCache) GetDeletedUser(sub string) (bool, error) {
-	return false, nil
+	scores, err := u.client.ZRevRange(context.Background(), "deleted_users", 0, -1).Result()
+	if err != nil {
+		return false, err
+	}
+
+	sort.Strings(scores)
+
+	return utils.BinarySearch(scores, sub) == -1, nil
 }
 
 func (u *userCache) RemoveDeletedUser(sub string) error {
-	return nil
+	return u.client.ZRem(context.Background(), "deleted_users", sub).Err()
 }
 
 func (u *userCache) SetInactiveUser(sub string) error {
-	return nil
+	err := u.client.ZAdd(context.Background(), "inactive_users", redis.Z{
+		Score:  float64(time.Now().Unix()),
+		Member: sub,
+	}).Err()
+	return err
 }
 
 func (u *userCache) GetInactiveUser(sub string) (bool, error) {
-	return false, nil
+	scores, err := u.client.ZRevRange(context.Background(), "inactive_users", 0, -1).Result()
+	if err != nil {
+		return false, err
+	}
+
+	sort.Strings(scores)
+
+	return utils.BinarySearch(scores, sub) == -1, nil
 }
 
 func (u *userCache) RemoveInactiveUser(sub string) error {
-	return nil
+	return u.client.ZRem(context.Background(), "inactive_users", sub).Err()
 }

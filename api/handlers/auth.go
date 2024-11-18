@@ -96,6 +96,20 @@ func (h *AuthHandler) Register(ctx *fiber.Ctx) error {
 			})
 		}
 
+		if errors.Is(err, services.ErrFailedToSendEmail) {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(types.APIResponse{
+				Status:  fiber.StatusInternalServerError,
+				Message: "user created but failed to send verification email",
+			})
+		}
+
+		if errors.Is(err, services.ErrTokenGeneration) {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(types.APIResponse{
+				Status:  fiber.StatusInternalServerError,
+				Message: "user created but failed to generate email verification token",
+			})
+		}
+
 		log.Print("error: ", err)
 		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
 			Status:  fiber.StatusInternalServerError,
@@ -135,6 +149,84 @@ func (h *AuthHandler) Register(ctx *fiber.Ctx) error {
 		Status:  fiber.StatusCreated,
 		Message: "successfully registered",
 		Details: tokens,
+	})
+}
+
+// RegenEmailVerification regenerates the email verification token for the user.
+// This action is only available to authenticated users.
+func (h *AuthHandler) RegenEmailVerification(ctx *fiber.Ctx) error {
+	// Get the user email from the locals in the fiber
+	sub, ok := ctx.Locals("user").(string)
+	if !ok {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(types.APIResponse{
+			Status:  fiber.StatusUnauthorized,
+			Message: "unauthorized",
+		})
+	}
+
+	err := h.authSvc.RegenEmailVerification(ctx.Context(), sub)
+	if err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+				Status:  fiber.StatusNotFound,
+				Message: "user not found",
+			})
+		} else if errors.Is(err, services.ErrFailedToSendEmail) {
+			return ctx.Status(fiber.StatusInternalServerError).JSON(types.APIResponse{
+				Status:  fiber.StatusInternalServerError,
+				Message: "failed to send email",
+			})
+		}
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.APIResponse{
+			Status:  fiber.StatusInternalServerError,
+			Message: "something went wrong",
+		})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(types.APIResponse{
+		Status:  fiber.StatusOK,
+		Message: "successfully regenerated email verification token",
+	})
+}
+
+// VerifyEmail verifies the email of the user.
+func (h *AuthHandler) VerifyEmail(ctx *fiber.Ctx) error {
+	token := ctx.Params("token")
+	if token == "" {
+		return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+			Status:  fiber.StatusBadRequest,
+			Message: "payload error",
+			Details: fiber.Map{
+				"type":  "params",
+				"error": "params not found",
+			},
+		})
+	}
+
+	err := h.authSvc.VerifyEmail(ctx.Context(), token)
+	if err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			return ctx.Status(fiber.StatusNotFound).JSON(types.APIResponse{
+				Status:  fiber.StatusNotFound,
+				Message: "user not found",
+			})
+		} else if errors.Is(err, services.ErrInvalidToken) {
+			return ctx.Status(fiber.StatusBadRequest).JSON(types.APIResponse{
+				Status:  fiber.StatusBadRequest,
+				Message: "invalid token",
+			})
+		}
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(types.APIResponse{
+			Status:  fiber.StatusInternalServerError,
+			Message: "something went wrong",
+		})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(types.APIResponse{
+		Status:  fiber.StatusOK,
+		Message: "successfully verified email",
 	})
 }
 

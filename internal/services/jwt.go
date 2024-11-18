@@ -69,7 +69,7 @@ func (s *jwtService) GenerateToken(config *types.TokenConfig) (string, error) {
 		"alg":  algorithm,
 		"sub":  config.Sub,
 		"typ":  config.Typ.String(),
-		"role": "user",
+		"role": config.Role,
 		"exp":  expiry,
 		"iat":  time.Now().Unix(),
 	})

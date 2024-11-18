@@ -31,7 +31,7 @@ func BinarySearch(slice []string, target string) int {
 }
 
 // ExtractInformation is a function that extracts information from an error message
-// and returns a string with the extracted information
+// and returns a string with the extracted information or the error message
 func ProcessError(err error) fiber.Map {
 	errMsg := fmt.Sprintf("%s ", err)
 	castringError := regexp.MustCompile(`cannot unmarshal (.*?) into Go struct field (.*?) of type (.*?) `)

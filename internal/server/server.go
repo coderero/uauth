@@ -59,6 +59,9 @@ func New() *Server {
 	// Initialize the user repository
 	userRepo := database.NewUserRepository(db)
 
+	// Initialize the user cache
+	userCache := cache.NewUserCache(redisCache.Cache())
+
 	// Initialize the crypt service
 	cryptoService := services.NewCryptService(15, 8, 1, 32, 12)
 
@@ -69,10 +72,10 @@ func New() *Server {
 	userService := services.NewUserService(userRepo, cryptoService)
 
 	// Initialize the middleware service
-	authMiddleWare := middlewares.NewAuthMiddleware(jwtService)
+	authMiddleWare := middlewares.NewAuthMiddleware(jwtService, userCache)
 
 	// Initialize the auth service
-	authService := services.NewAuthService(cryptoService, userRepo, jwtService)
+	authService := services.NewAuthService(cryptoService, userRepo, userCache, jwtService)
 
 	// Initialize the user handler
 	userHandler := handlers.NewUserHandler(validatorInstance, userService)
