@@ -5,7 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/coderero/paas-project/internal/utils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -45,6 +44,5 @@ func (j *jwtCache) IsRevoked(ctx context.Context, sub, token string) bool {
 	}
 
 	sort.Strings(score)
-
-	return utils.BinarySearch(score, token) == -1
+	return sort.SearchStrings(score, token) != -1
 }

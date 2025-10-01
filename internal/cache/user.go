@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/coderero/paas-project/api/models"
-	"github.com/coderero/paas-project/internal/utils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -97,8 +96,7 @@ func (u *userCache) GetDeletedUser(sub string) (bool, error) {
 	}
 
 	sort.Strings(scores)
-
-	return utils.BinarySearch(scores, sub) == -1, nil
+	return sort.SearchStrings(scores, sub) == -1, nil
 }
 
 func (u *userCache) RemoveDeletedUser(sub string) error {
@@ -120,8 +118,7 @@ func (u *userCache) GetInactiveUser(sub string) (bool, error) {
 	}
 
 	sort.Strings(scores)
-
-	return utils.BinarySearch(scores, sub) == -1, nil
+	return sort.SearchStrings(scores, sub) == -1, nil
 }
 
 func (u *userCache) RemoveInactiveUser(sub string) error {

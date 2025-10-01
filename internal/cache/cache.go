@@ -34,7 +34,7 @@ var (
 func New() Service {
 	num, err := strconv.Atoi(database)
 	if err != nil {
-		log.Fatalf(fmt.Sprintf("database incorrect %v", err))
+		log.Fatalf("database incorrect %v", err)
 	}
 
 	rdb := redis.NewClient(&redis.Options{
@@ -50,7 +50,7 @@ func New() Service {
 
 	_, err = rdb.Ping(context.Background()).Result()
 	if err != nil {
-		log.Fatalf(fmt.Sprintf("db down: %v", err))
+		log.Fatalf("db down: %v", err)
 	}
 
 	s := &service{db: rdb}
@@ -82,7 +82,7 @@ func (s *service) checkRedisHealth(ctx context.Context, stats map[string]string)
 	// Note: By extracting and simplifying like this, `log.Fatalf(fmt.Sprintf("db down: %v", err))`
 	// can be changed into a standard error instead of a fatal error.
 	if err != nil {
-		log.Fatalf(fmt.Sprintf("db down: %v", err))
+		log.Fatalf("db down: %v", err)
 	}
 
 	// Redis is up
