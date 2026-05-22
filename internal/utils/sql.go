@@ -19,30 +19,28 @@ var (
 )
 
 // BuildUserAccessSQL builds the SQL query for the user access filter.
-func BuildUserAccessSQL(filter *types.UserAccessFilter) (string, error) {
+// It returns the query string and a slice of parameterized arguments.
+func BuildUserAccessSQL(filter *types.UserAccessFilter) (string, []any, error) {
 	var conditions []string
-	filterCount := 0
+	var args []any
+	paramIndex := 1
 	baseQuery := "SELECT * FROM auth_users"
 
 	// Handle 'Every' flag separately
 	if filter.Every {
 		if filter.Admin != "" && filter.Admin == "true" {
 			conditions = append(conditions, "is_admin = true OR is_admin = false")
-			filterCount++
 		} else {
 			conditions = append(conditions, "is_admin = false")
-			filterCount++
 		}
 		if filter.Superadmin != "" && filter.Superadmin == "true" {
 			conditions = append(conditions, "is_superadmin = true OR is_superadmin = false")
-			filterCount++
 		} else {
 			conditions = append(conditions, "is_superadmin = false")
-			filterCount++
 		}
 		whereClause := strings.Join(conditions, " AND ")
 		baseQuery = fmt.Sprintf("%s WHERE %s", baseQuery, whereClause)
-		return baseQuery, nil
+		return baseQuery, args, nil
 	}
 
 	filters := map[string]string{
@@ -55,9 +53,6 @@ func BuildUserAccessSQL(filter *types.UserAccessFilter) (string, error) {
 	for _, v := range filters {
 		if v != "" {
 			conditions = append(conditions, v)
-			filterCount++
-		} else {
-			continue
 		}
 	}
 
@@ -84,8 +79,9 @@ func BuildUserAccessSQL(filter *types.UserAccessFilter) (string, error) {
 
 	orderField, order := SortPatternParser(filter.SortBy, filter.Order)
 	offset := (filter.Page - 1) * filter.Limit
-	baseQuery = fmt.Sprintf("%s ORDER BY %s %s LIMIT %d OFFSET %d", baseQuery, orderField, order, filter.Limit, offset)
-	return baseQuery, nil
+	baseQuery = fmt.Sprintf("%s ORDER BY %s %s LIMIT $%d OFFSET $%d", baseQuery, orderField, order, paramIndex, paramIndex+1)
+	args = append(args, filter.Limit, offset)
+	return baseQuery, args, nil
 }
 
 // getConditions for the boolean fields

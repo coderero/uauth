@@ -83,12 +83,12 @@ func (s *userRepository) GetUser(id int) (*models.User, error) {
 
 func (s *userRepository) GetUsers(optional *types.UserAccessFilter) ([]*models.User, error) {
 	// Build the SQL query
-	query, err := utils.BuildUserAccessSQL(optional)
+	query, args, err := utils.BuildUserAccessSQL(optional)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := s.db.Query(query)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
